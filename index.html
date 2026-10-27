@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بارکد پارس‌شید</title>
+<style>
+body{font-family:tahoma;background:#f1f4f8;margin:0;padding:16px;color:#222}
+main{max-width:500px;margin:auto}
+section{background:white;padding:16px;border-radius:12px;margin:12px 0}
+h2{text-align:center;color:#1456a0}
+input,button{box-sizing:border-box;width:100%;padding:13px;margin:6px 0;border-radius:8px;font-size:16px}
+input{border:1px solid #bbb}
+button{border:0;background:#1456a0;color:white}
+.red{background:#c62828}.green{background:#16834a}
+li{padding:10px;border-bottom:1px solid #ddd;word-break:break-all}
+small{color:#666}
+</style>
+</head>
+<body>
+<main>
+<section>
+<h2>پارس‌شید | ثبت بارکد</h2>
+<p>تعداد کل کارتن‌ها: <b id="count">0</b></p>
+<input id="code" placeholder="شماره بارکد کارتن را وارد کن">
+<button onclick="add()">ثبت بارکد</button>
+<button class="green" onclick="scan()">:camera: اسکن با دوربین</button>
+<video id="video" hidden style="width:100%"></video>
+<p id="msg"></p>
+</section>
+<section>
+<input id="search" placeholder="جستجوی بارکد..." oninput="show()">
+<ul id="list"></ul>
+<button class="green" onclick="exportCSV()">خروجی اکسل (CSV)</button>
+<button class="red" onclick="clearAll()">حذف همه اطلاعات</button>
+<small>اطلاعات روی همین گوشی ذخیره می‌شود.</small>
+</section>
+</main>
+<script>
+let records=JSON.parse(localStorage.getItem('parsshid')||'[]');
+function save(){localStorage.setItem('parsshid',JSON.stringify(records));show()}
+function add(value){
+let c=(value||document.getElementById('code').value).trim();
+let m=document.getElementById('msg');
+if(!c){m.textContent='شماره بارکد را وارد کن';return}
+if(records.some(x=>x.code===c)){m.textContent=':warning: این بارکد قبلاً ثبت شده!';return}
+records.unshift({code:c,date:new Date().toLocaleString('fa-IR')});
+document.getElementById('code').value='';
+m.textContent=':white_check_mark: بارکد ثبت شد';save()
+}
+function show(){
+let q=document.getElementById('search').value.trim();
+let arr=records.filter(x=>x.code.includes(q));
+document.getElementById('count').textContent=records.length;
+document.getElementById('list').innerHTML=arr.map(x=>'<li><b>'+esc(x.code)+'</b><br><small>'+esc(x.date)+'</small> <button onclick="del(\\''+esc(x.code)+'\\')">حذف</button></li>').join('');
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function del(c){records=records.filter(x=>x.code!==c);save()}
+function clearAll(){if(confirm('همه بارکدها حذف شوند؟')){records=[];save()}}
+function exportCSV(){
+let csv='Barcode,Date\\r\\n'+records.map(x=>'"'+x.code.replace(/"/g,'""')+'","'+x.date+'"').join('\\r\\n');
+let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='Parsshid-Barcodes.csv';a.click()
+}
+async function scan(){
+if(!('BarcodeDetector' in window)){alert('اسکن خودکار در این مرورگر پشتیبانی نمی‌شود؛ بارکد را دستی وارد کن.');return}
+try{
+let stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+let v=document.getElementById('video');v.hidden=false;v.srcObject=stream;await v.play();
+let detector=new BarcodeDetector();
+async function frame(){
+if(v.hidden)return;
+try{let b=await detector.detect(v);if(b.length){stream.getTracks().forEach(t=>t.stop());v.hidden=true;add(b[0].rawValue);return}}catch(e){}
+requestAnimationFrame(frame)
+}frame()
+}catch(e){alert('دوربین فعال نشد. اجازه دسترسی دوربین را بده.')}
+}
+show();
+</script>
+</body>
+</html>
